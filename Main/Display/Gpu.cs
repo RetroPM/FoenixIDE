@@ -174,9 +174,11 @@ namespace FoenixIDE.Display
         }
 
         private int mode = 0; // Mode 0 is FAT Vicky, 1 is Tiny Vicky.
-        public void SetMode(int mode)
+        private int sub_mode = 0; // Sub mode for Tiny Vicky, 0 = MMU version, 1 = Flat version
+        public void SetMode(int mode, int sub_mode)
         {
             this.mode = mode;
+            this.sub_mode = sub_mode;
         }
 
         const int STRIDE = 800;
@@ -291,9 +293,12 @@ namespace FoenixIDE.Display
                 int* bitmapPointer = (int*)bitmapData.Scan0.ToPointer();
 
                 // Load the SOL register - a lines
-                int SOLRegAddr = LineIRQRegister - VICKY.StartAddress;
-                int SOLLine0Addr = SOL0Address - VICKY.StartAddress;
-                int SOLLine1Addr = SOL1Address - VICKY.StartAddress;
+                //                int SOLRegAddr = LineIRQRegister - VICKY.StartAddress;
+                //                int SOLLine0Addr = SOL0Address - VICKY.StartAddress;
+                //                int SOLLine1Addr = SOL1Address - VICKY.StartAddress;
+                int SOLRegAddr = LineIRQRegister;
+                int SOLLine0Addr = SOL0Address;
+                int SOLLine1Addr = SOL1Address;
 
                 // Reset LUT Cache
                 //lutCache = new int[256 * 8]; // 8 LUTs
@@ -342,9 +347,9 @@ namespace FoenixIDE.Display
                     byte borderBlue = VICKY.ReadByte(MCRAddress + 7);
                     if (gammaCorrection)
                     {
-                        borderRed = VICKY.ReadByte(GammaBaseAddress + 0x200 + borderRed); //gammaCorrection[0x200 + borderGreen];
-                        borderGreen = VICKY.ReadByte(GammaBaseAddress + 0x100 + borderGreen); //gammaCorrection[0x100 + borderGreen];
-                        borderBlue = VICKY.ReadByte(GammaBaseAddress + borderBlue); // gammaCorrection[borderBlue];
+                        borderRed = VICKY.ReadByte(GammaRedBaseAddress + borderRed); //gammaCorrection[0x200 + borderGreen];
+                        borderGreen = VICKY.ReadByte(GammaGreenBaseAddress + borderGreen); //gammaCorrection[0x100 + borderGreen];
+                        borderBlue = VICKY.ReadByte(GammaBlueBaseAddress + borderBlue); // gammaCorrection[borderBlue];
                     }
                     int borderColor = (int)(0xFF000000 + (borderBlue << 16) + (borderGreen << 8) + borderRed);
 
@@ -373,9 +378,9 @@ namespace FoenixIDE.Display
                             byte backBlue = VICKY.ReadByte(MCRAddress + 0x0F);
                             if (gammaCorrection)
                             {
-                                backRed = VICKY.ReadByte(GammaBaseAddress + 0x200 + backRed); // gammaCorrection[0x200 + backRed];
-                                backGreen = VICKY.ReadByte(GammaBaseAddress + 0x100 + backGreen); //gammaCorrection[0x100 + backGreen];
-                                backBlue = VICKY.ReadByte(GammaBaseAddress + backBlue); //gammaCorrection[backBlue];
+                                backRed = VICKY.ReadByte(GammaRedBaseAddress + backRed); // gammaCorrection[0x200 + backRed];
+                                backGreen = VICKY.ReadByte(GammaGreenBaseAddress + backGreen); //gammaCorrection[0x100 + backGreen];
+                                backBlue = VICKY.ReadByte(GammaBlueBaseAddress + backBlue); //gammaCorrection[backBlue];
                             }
                             backgroundColor = (int)(0xFF000000 + (backBlue << 16) + (backGreen << 8) + backRed);
                         }
@@ -460,7 +465,7 @@ namespace FoenixIDE.Display
                             else
                             {
                                 // Tiny Vicky Layers for Bitmaps, Tilemaps and sprites
-                                byte LayerMgr0 = (byte)(VICKY.ReadByte(0xD002 - 0xC000) & 0x7);
+                                byte LayerMgr0 = (byte)(VICKY.ReadByte(0xD002 - 0xC000) & 0x7); // this addr calc should work for both MMU & Flat mode as it resolves to 0x1002 etc)
                                 byte LayerMgr1 = (byte)(VICKY.ReadByte(0xD002 - 0xC000) >> 4);
                                 byte LayerMgr2 = (byte)(VICKY.ReadByte(0xD003 - 0xC000) & 0x7);
                                 

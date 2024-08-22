@@ -109,6 +109,10 @@ namespace FoenixIDE.UI
                     {
                         version = BoardVersion.RevF256K_65816;
                     }
+                    else if (context["version"] == "RevF256K2e")
+                    {
+                        version = BoardVersion.RevF256K2e;
+                    }
                     boardVersionCommandLineSpecified = true;
                 }
             }
@@ -145,6 +149,9 @@ namespace FoenixIDE.UI
                     case "F256K(816)":
                         version = BoardVersion.RevF256K_65816;
                         break;
+                    case "F256K2e":
+                        version = BoardVersion.RevF256K2e;
+                        break;
                 }
             }
             if (defaultKernel == null)
@@ -169,6 +176,9 @@ namespace FoenixIDE.UI
                     case BoardVersion.RevF256K_6502:
                     case BoardVersion.RevF256K_65816:// All SKUs share the same kernelfile currently
                         defaultKernel = Path.Combine(romsDir, "kernel_F256jr.hex");
+                        break;
+                    case BoardVersion.RevF256K2e:// New Kernel for K2e
+                        defaultKernel = Path.Combine(romsDir, "kernel_F256K2e.hex");
                         break;
                 }
             }
@@ -215,7 +225,7 @@ namespace FoenixIDE.UI
             gpu.VICKY = kernel.MemMgr.VICKY;
             if (!BoardVersionHelpers.IsF256(version))
             {
-                gpu.SetMode(0);
+                gpu.SetMode(0, 0);
                 gpu.VRAM = kernel.MemMgr.VIDEO;
 
                 // This fontset is loaded just in case the kernel doesn't provide one.
@@ -235,7 +245,7 @@ namespace FoenixIDE.UI
 
                 gpu.SetFontBaseAddress(MemoryMap.FONT0_MEMORY_BANK_START - gpu.VICKY.StartAddress);
                 gpu.SetLUTBaseAddress(MemoryMap.GRP_LUT_BASE_ADDR - gpu.VICKY.StartAddress);
-                gpu.SetGammaBaseAddress(MemoryMap.GAMMA_BASE_ADDR - gpu.VICKY.StartAddress);
+                gpu.SetGammaBaseAddress(MemoryMap.GAMMA_BASE_ADDR - gpu.VICKY.StartAddress, 0x100);
                 gpu.SetLineIRQRegister(MemoryMap.VKY_LINE_IRQ_CTRL_REG);
                 gpu.SetSOL0Address(MemoryMap.VKY_LINE0_CMP_VALUE_LO);
                 gpu.SetSOL1Address(MemoryMap.VKY_LINE1_CMP_VALUE_LO);
@@ -249,34 +259,65 @@ namespace FoenixIDE.UI
             }
             else
             {
-                gpu.SetMode(1);
+                gpu.SetMode(1, BoardVersionHelpers.IsF256_Flat(version) ? 1 : 0);
                 gpu.VRAM = kernel.MemMgr.RAM;
 
                 // VIA Chip Port B is joystick 1
                 joystickWindow.SetMatrix(kernel.MemMgr.VIAREGISTERS, 0, 0);
 
-                // Addresses for VICKY in Junior are zero-based
-                gpu.SetMCRAddress(0x1000);
-                gpu.SetFGLUTAddress(MemoryMap.FG_CHAR_LUT_PTR_JR - 0xC000);  // IO Page 0
-                gpu.SetBGLUTAddress(MemoryMap.BG_CHAR_LUT_PTR_JR - 0xC000);  // IO Page 0
-                gpu.SetTextStartAddress(MemoryMap.SCREEN_PAGE_JR + 0x4000 - 0xC000);  // IO Page 2
-                gpu.SetTextColorStartAddress(MemoryMap.SCREEN_PAGE_JR + 0x6000 - 0xC000);  // IO Page 3
-                gpu.SetCursorCtrlRegister(MemoryMap.VKY_TXT_CURSOR_CTRL_REG_JR - 0xC000);  // IO Page 0
-                gpu.SetCursorCharacterAddress(MemoryMap.VKY_TXT_CURSOR_CHAR_REG_JR - 0xC000); // IO Page 0
-                gpu.SetCursorXAddress(MemoryMap.VKY_TXT_CURSOR_X_REG_JR - 0xC000); // IO Page 0
+                // see if this a Flat (65c816) Memory space or with MMU
+                if (BoardVersionHelpers.IsF256_Flat(version))
+                {
 
-                gpu.SetFontBaseAddress(MemoryMap.FONT_MEMORY_BANK_START_JR + 0x2000 - 0xC000);  // IO Page 1
-                gpu.SetLUTBaseAddress(MemoryMap.GRP_LUT_BASE_ADDR_JR + 0x2000 - 0xC000);  // IO Page 1
-                gpu.SetGammaBaseAddress(MemoryMap.GAMMA_BASE_ADDR_JR - 0xC000);  // IO Page 0
-                gpu.SetLineIRQRegister(MemoryMap.VKY_LINE_IRQ_CTRL_REG_JR - 0xC000);  // IO Page 0
-                gpu.SetSOL0Address(MemoryMap.VKY_LINE_CMP_VALUE_JR - 0xC000);  // IO Page 0
-                gpu.SetMousePointerRegister(0xD6E0 - 0xC000);  // IO Page 0
+                    // Addresses for VICKY in F256 K2e are in Flat space...
+                    gpu.SetMCRAddress(0x1000);
+                    gpu.SetFGLUTAddress(MemoryMap.FG_CHAR_LUT_PTR_F256_FLAT - gpu.VICKY.StartAddress);  // IO Page 0
+                    gpu.SetBGLUTAddress(MemoryMap.BG_CHAR_LUT_PTR_F256_FLAT - gpu.VICKY.StartAddress);  // IO Page 0
+                    gpu.SetTextStartAddress(MemoryMap.SCREEN_PAGE_TEXT_F256_FLAT - gpu.VICKY.StartAddress);  // IO Page 2
+                    gpu.SetTextColorStartAddress(MemoryMap.SCREEN_PAGE_COLOR_F256_FLAT - gpu.VICKY.StartAddress);  // IO Page 3
+                    gpu.SetCursorCtrlRegister(MemoryMap.VKY_TXT_CURSOR_CTRL_F256_FLAT - gpu.VICKY.StartAddress);  // IO Page 0
+                    gpu.SetCursorCharacterAddress(MemoryMap.VKY_TXT_CURSOR_CHAR_F256_FLAT - gpu.VICKY.StartAddress); // IO Page 0
+                    gpu.SetCursorXAddress(MemoryMap.VKY_TXT_CURSOR_X_F256_FLAT - gpu.VICKY.StartAddress); // IO Page 0
 
-                gpu.SetBitmapControlRegister(0xD100 - 0xC000);  // IO Page 0
-                gpu.SetTileMapBaseAddress(MemoryMap.TILE_CONTROL_REGISTER_ADDR_JR - 0xC000);
-                gpu.SetTilesetBaseAddress(MemoryMap.TILESET_BASE_ADDR_JR - 0xC000);
-                gpu.SetSpriteBaseAddress(0xD900 - 0xC000);
-                gpu.F256SOLReg = kernel.MemMgr.SOLRegister;
+                    gpu.SetFontBaseAddress(MemoryMap.FONT_MEMORY_BANK_START_F256_FLAT - gpu.VICKY.StartAddress);  // IO Page 1
+                    gpu.SetLUTBaseAddress(MemoryMap.GRP_LUT_BASE_ADDR_F256_FLAT - gpu.VICKY.StartAddress);  // IO Page 1
+                    gpu.SetGammaBaseAddress(MemoryMap.GAMMA_BASE_ADDR_F256_FLAT - gpu.VICKY.StartAddress, 0x400);  // IO Page 0
+                    gpu.SetLineIRQRegister(MemoryMap.VKY_LINE_IRQ_CTRL_F256_FLAT - gpu.VICKY.StartAddress);  // IO Page 0
+                    gpu.SetSOL0Address(MemoryMap.VKY_LINE_CMP_VALUE_F256_FLAT - gpu.VICKY.StartAddress);  // IO Page 0
+                    gpu.SetMousePointerRegister(MemoryMap.MOUSE_POINTER_F256_FLAT - gpu.VICKY.StartAddress);  // IO Page 0
+
+                    gpu.SetBitmapControlRegister(MemoryMap.BITMAP_CONTROL_REGISTER_ADDR_F256_FLAT - gpu.VICKY.StartAddress);  // IO Page 0
+                    gpu.SetTileMapBaseAddress(MemoryMap.TILE_CONTROL_REGISTER_ADDR_F256_FLAT - gpu.VICKY.StartAddress);
+                    gpu.SetTilesetBaseAddress(MemoryMap.TILESET_BASE_ADDR_F256_FLAT - gpu.VICKY.StartAddress);
+                    gpu.SetSpriteBaseAddress(MemoryMap.SPRITE_CONTROL_REGISTER_ADDR_F256_FLAT - gpu.VICKY.StartAddress);
+                    gpu.F256SOLReg = kernel.MemMgr.SOLRegister;
+                }
+                else
+                {
+                    // Addresses for VICKY in Junior are zero-based
+                    gpu.SetMCRAddress(0x1000);
+                    gpu.SetFGLUTAddress(MemoryMap.FG_CHAR_LUT_PTR_F256_MMU - 0xC000);  // IO Page 0
+                    gpu.SetBGLUTAddress(MemoryMap.BG_CHAR_LUT_PTR_F256_MMU - 0xC000);  // IO Page 0
+                    gpu.SetTextStartAddress(MemoryMap.SCREEN_PAGE_F256_MMU + 0x4000 - 0xC000);  // IO Page 2
+                    gpu.SetTextColorStartAddress(MemoryMap.SCREEN_PAGE_F256_MMU + 0x6000 - 0xC000);  // IO Page 3
+                    gpu.SetCursorCtrlRegister(MemoryMap.VKY_TXT_CURSOR_CTRL_F256_MMU - 0xC000);  // IO Page 0
+                    gpu.SetCursorCharacterAddress(MemoryMap.VKY_TXT_CURSOR_CHAR_F256_MMU - 0xC000); // IO Page 0
+                    gpu.SetCursorXAddress(MemoryMap.VKY_TXT_CURSOR_X_F256_MMU - 0xC000); // IO Page 0
+
+                    gpu.SetFontBaseAddress(MemoryMap.FONT_MEMORY_BANK_START_F256_MMU + 0x2000 - 0xC000);  // IO Page 1
+                    gpu.SetLUTBaseAddress(MemoryMap.GRP_LUT_BASE_ADDR_F256_MMU + 0x2000 - 0xC000);  // IO Page 1
+                    gpu.SetGammaBaseAddress(MemoryMap.GAMMA_BASE_ADDR_F256_MMU - 0xC000, 0x400);  // IO Page 0
+                    gpu.SetLineIRQRegister(MemoryMap.VKY_LINE_IRQ_CTRL_F256_MMU - 0xC000);  // IO Page 0
+                    gpu.SetSOL0Address(MemoryMap.VKY_LINE_CMP_VALUE_F256_MMU - 0xC000);  // IO Page 0
+                    gpu.SetMousePointerRegister(MemoryMap.MOUSE_POINTER_F256_MMU - 0xC000);  // IO Page 0
+
+                    gpu.SetBitmapControlRegister(MemoryMap.BITMAP_CONTROL_REGISTER_ADDR_F256_MMU - 0xC000);  // IO Page 0
+                    gpu.SetTileMapBaseAddress(MemoryMap.TILE_CONTROL_REGISTER_ADDR_F256_MMU - 0xC000);
+                    gpu.SetTilesetBaseAddress(MemoryMap.TILESET_BASE_ADDR_F256_MMU - 0xC000);
+                    gpu.SetSpriteBaseAddress(MemoryMap.SPRITE_CONTROL_REGISTER_ADDR_F256_MMU - 0xC000);
+                    gpu.F256SOLReg = kernel.MemMgr.SOLRegister;
+
+                }
             }
 
             if (disabledIRQs)
@@ -553,11 +594,11 @@ namespace FoenixIDE.UI
             if (!kernel.CPU.Flags.IrqDisable)
             {
                 // Check if the interrupt is enabled
-                byte mask = kernel.MemMgr.ReadByte(MemoryLocations.MemoryMap.INT_MASK_REG0);
+                byte mask = kernel.MemMgr.ReadByte(MemoryLocations.MemoryMap.INT_MASK_REG0); // ?? why read here in F256 Mode
                 if (BoardVersionHelpers.IsF256(version))
                 {
-                    // we need to this to avoid using the MMU IO Paging function
-                    mask = kernel.MemMgr.VICKY.ReadByte(MemoryLocations.MemoryMap.INT_MASK_REG0_JR - 0xC000);
+                    int addr = BoardVersionHelpers.IsF256_MMU(version) ? MemoryLocations.MemoryMap.INT_MASK_REG0_F256_MMU : MemoryLocations.MemoryMap.INT_MASK_REG0_F256_FLAT;
+                    mask = kernel.MemMgr.ReadByte(addr);
                 }
 
                 if (!kernel.CPU.DebugPause)
@@ -567,7 +608,8 @@ namespace FoenixIDE.UI
                     if (BoardVersionHelpers.IsF256(version))
                     {
                         // we need to this to avoid using the MMU IO Paging function
-                        IRQ0 = kernel.MemMgr.VICKY.ReadByte(MemoryLocations.MemoryMap.INT_PENDING_REG0_JR - 0xC000);
+                        int addr = BoardVersionHelpers.IsF256_MMU(version) ? MemoryLocations.MemoryMap.INT_PENDING_REG0_F256_MMU : MemoryLocations.MemoryMap.INT_PENDING_REG0_F256_FLAT;
+                        IRQ0 = kernel.MemMgr.ReadByte(addr);
                     }
                     IRQ0 |= (byte)Register0.FNX0_INT00_SOF;
                     kernel.MemMgr.INTERRUPT.WriteFromGabe(0, IRQ0);
@@ -588,7 +630,8 @@ namespace FoenixIDE.UI
                 byte mask = kernel.MemMgr.ReadByte(MemoryLocations.MemoryMap.INT_MASK_REG0);
                 if (BoardVersionHelpers.IsF256(version))
                 {
-                    mask = kernel.MemMgr.ReadByte(MemoryLocations.MemoryMap.INT_MASK_REG0_JR);
+                    int addr = BoardVersionHelpers.IsF256_MMU(version) ? MemoryLocations.MemoryMap.INT_MASK_REG0_F256_MMU : MemoryLocations.MemoryMap.INT_MASK_REG0_F256_FLAT;
+                    mask = kernel.MemMgr.ReadByte(addr);
                 }
                 // if (!kernel.CPU.DebugPause && !kernel.CPU.Flags.IrqDisable && ((~mask & (byte)Register0.FNX0_INT01_SOL) == (byte)Register0.FNX0_INT01_SOL))
                 if (!kernel.CPU.DebugPause && ((~mask & (byte)Register0.FNX0_INT01_SOL) == (byte)Register0.FNX0_INT01_SOL))
@@ -597,7 +640,8 @@ namespace FoenixIDE.UI
                     byte IRQ0 = kernel.MemMgr.ReadByte(MemoryLocations.MemoryMap.INT_PENDING_REG0);
                     if (BoardVersionHelpers.IsF256(version))
                     {
-                        IRQ0 = kernel.MemMgr.ReadByte(MemoryLocations.MemoryMap.INT_PENDING_REG0_JR - 0xC000);
+                        int addr = BoardVersionHelpers.IsF256_MMU(version) ? MemoryLocations.MemoryMap.INT_PENDING_REG0_F256_MMU : MemoryLocations.MemoryMap.INT_PENDING_REG0_F256_FLAT;
+                        IRQ0 = kernel.MemMgr.ReadByte(addr);
                     }
                     IRQ0 |= (byte)Register0.FNX0_INT01_SOL;
                     kernel.MemMgr.INTERRUPT.WriteFromGabe(0, IRQ0);
@@ -617,7 +661,8 @@ namespace FoenixIDE.UI
             byte mask = kernel.MemMgr.ReadByte(MemoryLocations.MemoryMap.INT_MASK_REG1);
             if (BoardVersionHelpers.IsF256(version))
             {
-                mask = kernel.MemMgr.ReadByte(MemoryLocations.MemoryMap.INT_MASK_REG0_JR + 1);
+                int addr = BoardVersionHelpers.IsF256_MMU(version) ? MemoryLocations.MemoryMap.INT_MASK_REG0_F256_MMU : MemoryLocations.MemoryMap.INT_MASK_REG0_F256_FLAT;
+                mask = kernel.MemMgr.ReadByte(addr + 1);
             }
             if (!kernel.CPU.DebugPause && (~mask & (byte)Register1.FNX1_INT07_SDCARD) == (byte)Register1.FNX1_INT07_SDCARD)
             {
@@ -625,7 +670,8 @@ namespace FoenixIDE.UI
                 byte IRQ1 = kernel.MemMgr.ReadByte(MemoryLocations.MemoryMap.INT_PENDING_REG1);
                 if (BoardVersionHelpers.IsF256(version))
                 {
-                    IRQ1 = kernel.MemMgr.ReadByte(MemoryLocations.MemoryMap.INT_PENDING_REG0_JR + 1);
+                    int addr = BoardVersionHelpers.IsF256_MMU(version) ? MemoryLocations.MemoryMap.INT_PENDING_REG0_F256_MMU : MemoryLocations.MemoryMap.INT_PENDING_REG0_F256_FLAT;
+                    IRQ1 = kernel.MemMgr.ReadByte(addr + 1);
                 }
                 IRQ1 |= (byte)Register1.FNX1_INT07_SDCARD;
                 kernel.MemMgr.INTERRUPT.WriteFromGabe(1, IRQ1);
@@ -753,7 +799,11 @@ namespace FoenixIDE.UI
                     kernel.MemMgr.VIAREGISTERS.WriteScanCode(sc[0]);
 
                     // Check if the Keyboard interrupt is allowed
-                    byte mask = kernel.MemMgr.VICKY.ReadByte(MemoryMap.INT_MASK_REG0_JR + 1 - 0xC000);
+                    int addr = BoardVersionHelpers.IsF256_MMU(version) ? MemoryLocations.MemoryMap.INT_MASK_REG0_F256_MMU : MemoryLocations.MemoryMap.INT_MASK_REG0_F256_FLAT;
+                    byte mask = kernel.MemMgr.ReadByte(addr + 1);
+//                    if (BoardVersionHelpers.IsF256_Flat(version))
+//                        mask = 0x6f;
+
                     if ((~mask & (byte)Register1_JR.JR1_INT06_VIA1) != 0)
                     {
                         TriggerKeyboardInterrupt();
@@ -789,7 +839,8 @@ namespace FoenixIDE.UI
                 }
                 else
                 {
-                    byte mask = kernel.MemMgr.VICKY.ReadByte(MemoryMap.INT_MASK_REG0_JR - 0xC000);
+                    int addr = BoardVersionHelpers.IsF256_MMU(version) ? MemoryLocations.MemoryMap.INT_MASK_REG0_F256_MMU : MemoryLocations.MemoryMap.INT_MASK_REG0_F256_FLAT;
+                    byte mask = kernel.MemMgr.ReadByte(addr);
                     if ((~mask & (byte)Register0_JR.JR0_INT02_KBD) != 0)
                     {
                         // Set the Keyboard Interrupt
@@ -1187,10 +1238,20 @@ namespace FoenixIDE.UI
                 }
                 else
                 {
-                    previousGraphicMode = kernel.MemMgr.VICKY.ReadByte(0xD000 - 0xC000);
-                    kernel.MemMgr.VICKY.WriteByte(0x1000, 0x10);
-                    // Enable borders
-                    kernel.MemMgr.VICKY.WriteByte(0x1004, 1);
+                    if (!BoardVersionHelpers.IsF256_MMU(version))
+                    {
+                        previousGraphicMode = kernel.MemMgr.VICKY.ReadByte(0xD000 - 0xC000);
+                        kernel.MemMgr.VICKY.WriteByte(0x1000, 0x10);
+                        // Enable borders
+                        kernel.MemMgr.VICKY.WriteByte(0x1004, 1);
+                    }
+                    else
+                    {
+                        previousGraphicMode = kernel.MemMgr.VICKY.ReadByte(0);
+                        kernel.MemMgr.VICKY.WriteByte(0x00, 0x10);
+                        // Enable borders
+                        kernel.MemMgr.VICKY.WriteByte(0x04, 1);
+                    }
                 }
                 CenterForm(tileEditor);
                 tileEditor.Show();
@@ -1343,27 +1404,51 @@ namespace FoenixIDE.UI
             }
             else
             {
-                byte mouseReg = kernel.MemMgr.VICKY.ReadByte(0xD6E0 - 0xC000);
-                bool mouseEnabled = (mouseReg & 1) != 0;
-                bool mouseMode1 = (mouseReg & 2) != 0;
-
-                if (mouseEnabled)
+                if (!BoardVersionHelpers.IsF256_MMU(version))
                 {
-                    if (mouseMode1)
+                    byte mouseReg = kernel.MemMgr.VICKY.ReadByte(0xD6E0 - 0xC000);
+                    bool mouseEnabled = (mouseReg & 1) != 0;
+                    bool mouseMode1 = (mouseReg & 2) != 0;
+
+                    if (mouseEnabled)
                     {
-                        kernel.MemMgr.VICKY.WriteWord(0xD6E6 - 0xC000, (byte)(8 + (middle ? 4 : 0) + (right ? 2 : 0) + (left ? 1 : 0)));
-                        kernel.MemMgr.VICKY.WriteWord(0xD6E7 - 0xC000, (byte)(X & 0xFF));
-                        kernel.MemMgr.VICKY.WriteWord(0xD6E8 - 0xC000, (byte)(Y & 0xFF));
-                    }
-                    else
-                    {
-                        kernel.MemMgr.VICKY.WriteWord(0xD6E2 - 0xC000, X);
-                        kernel.MemMgr.VICKY.WriteWord(0xD6E4 - 0xC000, Y);
+                        if (mouseMode1)
+                        {
+                            kernel.MemMgr.VICKY.WriteWord(0xD6E6 - 0xC000, (byte)(8 + (middle ? 4 : 0) + (right ? 2 : 0) + (left ? 1 : 0)));
+                            kernel.MemMgr.VICKY.WriteWord(0xD6E7 - 0xC000, (byte)(X & 0xFF));
+                            kernel.MemMgr.VICKY.WriteWord(0xD6E8 - 0xC000, (byte)(Y & 0xFF));
+                        }
+                        else
+                        {
+                            kernel.MemMgr.VICKY.WriteWord(0xD6E2 - 0xC000, X);
+                            kernel.MemMgr.VICKY.WriteWord(0xD6E4 - 0xC000, Y);
+                        }
                     }
                 }
+                else
+                {
+                    byte mouseReg = kernel.MemMgr.VICKY.ReadByte(0x16E0);
+                    bool mouseEnabled = (mouseReg & 1) != 0;
+                    bool mouseMode1 = (mouseReg & 2) != 0;
 
+                    if (mouseEnabled)
+                    {
+                        if (mouseMode1)
+                        {
+                            kernel.MemMgr.VICKY.WriteWord(0x16E6, (byte)(8 + (middle ? 4 : 0) + (right ? 2 : 0) + (left ? 1 : 0)));
+                            kernel.MemMgr.VICKY.WriteWord(0x16E7, (byte)(X & 0xFF));
+                            kernel.MemMgr.VICKY.WriteWord(0x16E8, (byte)(Y & 0xFF));
+                        }
+                        else
+                        {
+                            kernel.MemMgr.VICKY.WriteWord(0x16E2, X);
+                            kernel.MemMgr.VICKY.WriteWord(0x16E4, Y);
+                        }
+                    }
+                }
                 // Generate three interrupts - to emulate how the PS/2 controller works
-                byte mask = kernel.MemMgr.ReadByte(MemoryLocations.MemoryMap.INT_MASK_REG0_JR);
+                int addr = BoardVersionHelpers.IsF256_MMU(version) ? MemoryLocations.MemoryMap.INT_MASK_REG0_F256_MMU : MemoryLocations.MemoryMap.INT_MASK_REG0_F256_FLAT;
+                byte mask = kernel.MemMgr.ReadByte(addr);
                 // The PS/2 packet is byte0, xm, ym
                 if ((~mask & (byte)Register0_JR.JR0_INT03_MOUSE) == (byte)Register0_JR.JR0_INT03_MOUSE)
                 {
@@ -1511,6 +1596,11 @@ namespace FoenixIDE.UI
                 toolStripRevision.Text = "Rev F256K(816)";
                 shortVersion = "F256K(816)";
             }
+            else if (version == BoardVersion.RevF256K2e)
+            {
+                toolStripRevision.Text = "Rev F256K2e";
+                shortVersion = "F256K2e";
+            }
 
             // force repaint
             statusStrip1.Invalidate();
@@ -1561,6 +1651,11 @@ namespace FoenixIDE.UI
             {
                 version = BoardVersion.RevF256K_65816;
                 defaultKernel += Path.Combine("roms", "kernel_F256jr.hex");
+            }
+            else if (e.ClickedItem == revF256K2eToolStripMenuItem)
+            {
+                version = BoardVersion.RevF256K2e;
+                defaultKernel += Path.Combine("roms", "kernel_F256K2e.hex");
             }
 
             kernel.SetVersion(version);
@@ -1691,8 +1786,9 @@ namespace FoenixIDE.UI
 
                 if (kernel.MemMgr != null && kernel.MemMgr.VICKY != null)
                 {
+                    int Vicky_Address = BoardVersionHelpers.IsF256_MMU(version) ? MemoryMap.VICKY_START_F256_MMU - 0xC000 : (MemoryMap.VICKY_START_F256_FLAT - kernel.MemMgr.VICKY.StartAddress);
                     // switch 6 - Gamma
-                    byte MCR = kernel.MemMgr.VICKY.ReadByte(MemoryMap.VICKY_START_JR - 0xC000);
+                    byte MCR = kernel.MemMgr.VICKY.ReadByte(Vicky_Address);
                     if (switches[7])
                     {
                         MCR |= 0x40;
@@ -1701,17 +1797,20 @@ namespace FoenixIDE.UI
                     {
                         MCR &= 0b1011_1111;
                     }
-                    kernel.MemMgr.VICKY.WriteByte(MemoryMap.VICKY_START_JR - 0xC000, MCR);
+                    kernel.MemMgr.VICKY.WriteByte(Vicky_Address, MCR);
 
                     // DIP Switch register
-                    kernel.MemMgr.VICKY.WriteByte(MemoryMap.DIPSWITCH_JR - 0xC000, dipValue);
+                    if (BoardVersionHelpers.IsF256_MMU(version))
+                        kernel.MemMgr.VICKY.WriteByte(MemoryMap.DIPSWITCH_F256_MMU - 0xC000, dipValue);
+                    else
+                        kernel.MemMgr.VICKY.WriteByte(MemoryMap.DIPSWITCH_F256_FLAT - kernel.MemMgr.VICKY.StartAddress, dipValue);
                 }
             }
         }
 
         public void WriteMCRBytesToVicky(byte low, byte high)
         {
-            int baseAddr = BoardVersionHelpers.IsF256(version) ? 0xD000 - 0xC000 : 0;
+            int baseAddr = BoardVersionHelpers.IsF256_MMU(version) ? 0xD000 - 0xC000 : 0;
 
             kernel.MemMgr.VICKY.WriteByte(baseAddr, low);
             kernel.MemMgr.VICKY.WriteByte(baseAddr + 1, high);
@@ -1719,7 +1818,7 @@ namespace FoenixIDE.UI
 
         public ushort ReadMCRBytesFromVicky()
         {
-            return (ushort)kernel.MemMgr.VICKY.ReadWord(BoardVersionHelpers.IsF256(version) ? 0xD000 - 0xC000 : 0);
+            return (ushort)kernel.MemMgr.VICKY.ReadWord(BoardVersionHelpers.IsF256_MMU(version) ? 0xD000 - 0xC000 : 0);
         }
 
         public void UpdateGamma(bool gamma)

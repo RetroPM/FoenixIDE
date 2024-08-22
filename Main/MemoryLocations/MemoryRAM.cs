@@ -77,8 +77,13 @@ namespace FoenixIDE.MemoryLocations
             }
         }
 
+        bool this_is_it = false;
+
         public virtual void WriteByte(int Address, byte Value)
         {
+            if (Address == 0x166D)
+                this_is_it = true;
+
             var d = data;
             d[Address] = Value;
         }

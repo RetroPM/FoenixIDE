@@ -80,9 +80,15 @@ namespace FoenixIDE.Display
         int[] FGTextLUT = new int[16];
         int[] BGTextLUT = new int[16];
         int GammaBaseAddress;
-        public void SetGammaBaseAddress(int val)
+        int GammaBlueBaseAddress;
+        int GammaGreenBaseAddress;
+        int GammaRedBaseAddress;
+        public void SetGammaBaseAddress(int val, int stride)
         {
             GammaBaseAddress = val;
+            GammaBlueBaseAddress = GammaBaseAddress;
+            GammaGreenBaseAddress = GammaBaseAddress + stride;
+            GammaRedBaseAddress = GammaBaseAddress + stride * 2;
         }
         int SOL0Address;
         public void SetSOL0Address(int val)
@@ -164,6 +170,7 @@ namespace FoenixIDE.Display
         private void GetTextLUT(byte fg, byte bg, bool gamma, out int value0, out int value1)
         {
             var fgt = FGTextLUT;
+
             if (fgt[fg] == 0)
             {
                 // In order to reduce the load of applying Gamma correction, load single bytes
@@ -173,9 +180,9 @@ namespace FoenixIDE.Display
 
                 if (gamma)
                 {
-                    fgValueBlue = VICKY.ReadByte(GammaBaseAddress + fgValueBlue); //gammaCorrection[fgValueBlue];
-                    fgValueGreen = VICKY.ReadByte(GammaBaseAddress + 0x100 + fgValueGreen);//gammaCorrection[0x100 + fgValueGreen];
-                    fgValueRed = VICKY.ReadByte(GammaBaseAddress + 0x200 + fgValueRed);//gammaCorrection[0x200 + fgValueRed];
+                    fgValueBlue = VICKY.ReadByte(GammaBlueBaseAddress + fgValueBlue);
+                    fgValueGreen = VICKY.ReadByte(GammaGreenBaseAddress + fgValueGreen);
+                    fgValueRed = VICKY.ReadByte(GammaRedBaseAddress + fgValueRed);
                 }
 
                 value0 = (int)((fgValueBlue << 16) + (fgValueGreen << 8) + fgValueRed + 0xFF000000);
@@ -195,9 +202,9 @@ namespace FoenixIDE.Display
 
                 if (gamma)
                 {
-                    bgValueBlue = VICKY.ReadByte(GammaBaseAddress + bgValueBlue); //gammaCorrection[bgValueBlue];
-                    bgValueGreen = VICKY.ReadByte(GammaBaseAddress + 0x100 + bgValueGreen); //gammaCorrection[0x100 + bgValueGreen];
-                    bgValueRed = VICKY.ReadByte(GammaBaseAddress + 0x200 + bgValueRed); //gammaCorrection[0x200 + bgValueRed];
+                    bgValueBlue = VICKY.ReadByte(GammaBlueBaseAddress + bgValueBlue);
+                    bgValueGreen = VICKY.ReadByte(GammaGreenBaseAddress + bgValueGreen);
+                    bgValueRed = VICKY.ReadByte(GammaRedBaseAddress + bgValueRed);
                 }
 
                 value1 = (int)((bgValueBlue << 16) + (bgValueGreen << 8) + bgValueRed + 0xFF000000);
@@ -224,9 +231,9 @@ namespace FoenixIDE.Display
                 byte blue = VICKY.ReadByte(lutAddress + 2);
                 if (gamma)
                 {
-                    blue = VICKY.ReadByte(GammaBaseAddress + blue);           // gammaCorrection[fgValueBlue];
-                    green = VICKY.ReadByte(GammaBaseAddress + 0x100 + green); // gammaCorrection[0x100 + fgValueGreen];
-                    red = VICKY.ReadByte(GammaBaseAddress + 0x200 + red);     // gammaCorrection[0x200 + fgValueRed];
+                    blue = VICKY.ReadByte(GammaBlueBaseAddress + blue);           // gammaCorrection[fgValueBlue];
+                    green = VICKY.ReadByte(GammaGreenBaseAddress + green); // gammaCorrection[0x100 + fgValueGreen];
+                    red = VICKY.ReadByte(GammaRedBaseAddress + red);     // gammaCorrection[0x200 + fgValueRed];
                 }
                 value = (int)((blue << 16) + (green << 8) + red + 0xFF000000);
                 lc[lutIndex * 256 + color] = value;
@@ -309,9 +316,11 @@ namespace FoenixIDE.Display
 
                 byte fgColor = (byte)((color & 0xF0) >> 4);
                 byte bgColor = (byte)(color & 0x0F);
+ //               fgColor = (byte)(col & 0x0f);
 
                 // This is where the memory goes:
                 GetTextLUT(fgColor, bgColor, gammaCorrection, out textcolor0, out textcolor1);
+//                textcolor0 = (0xff << 24) | 0x80c040;
 
                 byte value = VICKY.ReadByte(fontBaseAddress + (showFont1 ? 0x800 : 0) + character * 8 + fontLine);
                 //int offset = (x + line * 640) * 4;
@@ -688,6 +697,7 @@ namespace FoenixIDE.Display
         }
         private unsafe void DrawMouse(int* p, bool gammaCorrection, int line, int width, int height)
         {
+
             byte mouseReg = VICKY.ReadByte(mode == 0 ? MemoryMap.MOUSE_PTR_REG - VICKY.StartAddress: 0xD6e0 -0xC000);
             
             bool MousePointerEnabled = (mouseReg & 3) != 0;
@@ -715,9 +725,9 @@ namespace FoenixIDE.Display
                         {
                             if (gammaCorrection)
                             {
-                                pixelIndexB = VICKY.ReadByte(GammaBaseAddress + pixelIndexR); // gammaCorrection[pixelIndexR];
-                                pixelIndexG = VICKY.ReadByte(GammaBaseAddress + 0x100 + pixelIndexR); //gammaCorrection[0x100 + pixelIndexR];
-                                pixelIndexR = VICKY.ReadByte(GammaBaseAddress + 0x200 + pixelIndexR); //gammaCorrection[0x200 + pixelIndexR];
+                                pixelIndexB = VICKY.ReadByte(GammaBlueBaseAddress + pixelIndexR); // gammaCorrection[pixelIndexR];
+                                pixelIndexG = VICKY.ReadByte(GammaGreenBaseAddress + pixelIndexR); //gammaCorrection[0x100 + pixelIndexR];
+                                pixelIndexR = VICKY.ReadByte(GammaRedBaseAddress + pixelIndexR); //gammaCorrection[0x200 + pixelIndexR];
                             }
                             int value = (int)((pixelIndexB << 16) + (pixelIndexG << 8) + pixelIndexR + 0xFF000000);
                             ptr[col + PosX] = value;
