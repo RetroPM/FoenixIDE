@@ -316,11 +316,9 @@ namespace FoenixIDE.Display
 
                 byte fgColor = (byte)((color & 0xF0) >> 4);
                 byte bgColor = (byte)(color & 0x0F);
- //               fgColor = (byte)(col & 0x0f);
 
                 // This is where the memory goes:
                 GetTextLUT(fgColor, bgColor, gammaCorrection, out textcolor0, out textcolor1);
-//                textcolor0 = (0xff << 24) | 0x80c040;
 
                 byte value = VICKY.ReadByte(fontBaseAddress + (showFont1 ? 0x800 : 0) + character * 8 + fontLine);
                 //int offset = (x + line * 640) * 4;
@@ -697,7 +695,6 @@ namespace FoenixIDE.Display
         }
         private unsafe void DrawMouse(int* p, bool gammaCorrection, int line, int width, int height)
         {
-
             byte mouseReg = VICKY.ReadByte(mode == 0 ? MemoryMap.MOUSE_PTR_REG - VICKY.StartAddress: 0xD6e0 -0xC000);
             
             bool MousePointerEnabled = (mouseReg & 3) != 0;
